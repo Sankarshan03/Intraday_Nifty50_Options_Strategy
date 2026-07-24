@@ -148,16 +148,5 @@ The notebook plots equity curves for all four strategies (3 individual + ensembl
 5. **Options Greeks**: Incorporate Delta and Gamma for more accurate P&L
 6. **Machine Learning**: Use ML to enhance signal generation
 
-## License
-
-This project is for educational and research purposes only. Not intended for live trading.
-
-## Disclaimer
-
-Past performance does not guarantee future results. This backtest is based on historical data and may not account for all real-world trading conditions including:
-- Transaction costs and bid-ask spreads
-- Slippage and liquidity constraints
-- Market impact
-- Data quality issues
 
 Always validate with live paper trading before deploying with real capital.
