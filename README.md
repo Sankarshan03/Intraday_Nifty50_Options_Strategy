@@ -1,152 +1,133 @@
-# README for Intraday Nifty50 Options Strategy Backtest
+# Nifty 50 Options — Three-Sleeve Intraday Strategy
 
-## Overview
+A systematic trading strategy for Nifty 50 options that combines three distinct signal sleeves — **Mean Reversion**, **Trend Following**, and **Semi-Directional** — using an ensemble approach with dynamic weighting.
 
-This notebook implements a comprehensive backtesting framework for three distinct trading strategies on Nifty 50 index options:
+## Strategy Overview
 
-1. **Mean Reversion Strategy** - Capitalizes on price deviations from historical averages
-2. **Trend Following Strategy** - Captures directional momentum with breakout confirmation
-3. **Semi-Directional Breakout Strategy** - Trades breakouts above previous highs or below previous lows
+The strategy operates on intraday minute-bar data and generates daily signals based on:
 
-The strategies are combined into an ensemble portfolio using inverse volatility weighting, demonstrating robust performance across different market conditions.
+| Sleeve | Trigger | Direction |
+|--------|---------|-----------|
+| **Mean Reversion** | Z-score < -1 or > +1 on open | Fade the move |
+| **Trend Following** | EWM crossover + momentum + breakout strength | Follow the move |
+| **Semi-Directional** | Open gaps above prev-high / below prev-low by ≥ 0.2 ATR | Follow gap direction |
 
-## Key Features
+### Ensemble Blends
 
-- **Synthetic Spot Construction**: Derives a continuous spot price series from front-month call/put parity
-- **Adaptive Technical Indicators**: Uses Adaptive EMA (AEMA) and volatility-normalized signals
-- **Daily Signal Generation**: Converts intraday data to daily signals with proper look-ahead bias prevention
-- **Ensemble Portfolio**: Combines strategies with inverse volatility weighting for improved risk-adjusted returns
-- **Comprehensive Metrics**: Calculates CAGR, Sharpe ratio, Maximum Drawdown, Win Rate, Calmar ratio, and more
+| Blend | Composition | Use Case |
+|-------|-------------|----------|
+| **Static** | 45% MR / 0% TR / 55% SD | Reporting baseline |
+| **Live** | 20% Static + 80% Inverse-Volatility | Primary execution |
+| **Returns-Weighted** | Dynamic weights from 60-day trailing returns | Alternative approach |
+
+## 📈 Performance Summary (2025–2026)
+
+| Strategy | Trades | Win Rate | CAGR | Sharpe | Sortino | Max DD | Calmar |
+|----------|--------|----------|------|--------|---------|--------|--------|
+| Mean Reversion | 104 | 51.9% | 3.01% | 0.80 | 0.86 | 3.46% | 0.87 |
+| Trend Following | 45 | 51.1% | 0.07% | 0.05 | 0.04 | 1.80% | 0.04 |
+| Semi-Directional | 51 | 72.5% | 10.43% | 3.33 | 4.49 | 1.62% | 6.43 |
+| **Ensemble — Static** | 133 | 63.2% | 7.08% | 3.38 | 4.56 | 0.78% | **9.05** |
+| **Ensemble — Live** | 138 | 58.0% | 4.12% | 2.53 | 3.65 | 1.14% | 3.62 |
+| Ensemble — Returns-Weighted | 116 | 58.6% | 6.71% | 2.40 | 3.11 | 1.56% | 4.29 |
+
+### Walk-Forward Performance (Static Blend)
+
+| Window | Period | Days | CAGR | Max DD | Calmar |
+|--------|--------|------|------|--------|--------|
+| W1 | 2025-01-01 → 2025-03-21 | 55 | +12.69% | 0.51% | 24.98 |
+| W2 | 2025-03-24 → 2025-06-16 | 56 | +20.60% | 0.78% | 26.30 |
+| W3 | 2025-06-17 → 2025-09-04 | 56 | +0.38% | 0.76% | 0.51 |
+| W4 | 2025-09-05 → 2026-05-15 | 56 | +3.36% | 0.58% | 5.74 |
+
+**Mean Calmar = 14.38 | Std = 11.42**
 
 ## Data Requirements
 
-The notebook expects a Parquet file containing cleaned Nifty 50 options data with the following columns:
+- **Source:** `nifty_options_chain_clean` Parquet file
+- **Period:** 2023-01-02 to 2026-05-15 (702 trading days)
+- **Format:** Minute bars with OHLCV, expiry, option type, and strike data
+- **Size:** ~91 million rows
 
-| Column | Description |
-|--------|-------------|
-| `ticker` | Option ticker symbol |
-| `bar_minute` | Timestamp of the bar |
-| `open/high/low/close` | OHLC prices |
-| `volume` | Trading volume |
-| `expiry` | Option expiry date |
-| `opt_type` | Option type ('C' for Call, 'P' for Put) |
-| `strike` | Strike price |
-| `feed_era` | Data vendor identifier |
-| `is_closing_bar` | Boolean flag for closing bars |
+### Key Data Processing Steps
 
-### File Path
-```
-C:\Users\Admin\Downloads\nifty_options_chain_clean_2023-01-02_to_2026-05-15.parquet
-```
+1. **Synthetic Spot** — Calculated via put-call parity on front-month ATM options
+2. **Intraday Features** — ATR (14-bar), AEMA (adaptive EMA)
+3. **Daily Aggregation** — OHLC, ATR, trend indicators, Z-scores
+4. **Signal Generation** — Three independent signal streams
+5. **Ensemble Blending** — Dynamic and static weight combinations
 
-## Installation
+## Quick Start
+
+### Prerequisites
 
 ```bash
-pip install numpy pandas matplotlib fastparquet
+pip install numpy pandas matplotlib scipy fastparquet
 ```
 
-## Notebook Structure
+### Running the Notebook
 
-### 1. Data Loading & Filtering
-- Loads the options data from Parquet format
-- Filters to the most recent 12 months (2025-06-30 to 2026-06-30)
-- Displays data summary statistics
+1. **Update data path** in the configuration cell:
+```python
+PARQUET_PATH = r'path/to/your/nifty_options_chain_clean.parquet'
+```
 
-### 2. Synthetic Spot Construction
-- Identifies front-month expiries for each timestamp
-- Uses call-put parity: `Synthetic Spot = Strike + (Call Price - Put Price)`
-- Selects the ATM strike closest to the synthetic spot
-- Creates OTM option legs for the semi-directional strategy
+2. **Run all cells** sequentially
 
-### 3. Feature Engineering
-- Calculates True Range and ATR (Average True Range)
-- Implements Adaptive EMA (AEMA) with expanding normalization
-- Computes Z-scores, trend strength, and half-life metrics
-- **No look-ahead bias**: All features use only historical data
+3. **Outputs** will be saved as:
+   - `strategy_returns_log.csv` — Daily P&L and equity curves
+   - `strategy_metrics_summary.csv` — Performance metrics
+   - `equity_curves.png` — Visualization
 
-### 4. Strategy Signals (Daily)
+### Optional Regime Diagnostic
 
-#### Mean Reversion Signal
-- **Entry**: When Z-score < -1.0 → BUY; when Z-score > 1.0 → SELL
-- **Exit**: Next day closing price
-- **Rationale**: Prices tend to revert to their historical mean
-
-#### Trend Following Signal
-- **Entry**: Requires simultaneous confirmation of:
-  - Breakout above/below previous close
-  - Positive/negative trend gap (fast > slow EMA)
-  - Momentum threshold (|trend_momentum| > 0.15%)
-  - Trend strength > 0.35
-  - Breakout strength > 0.20
-- **Exit**: Next day closing price
-- **Rationale**: Captures sustained directional moves
-
-#### Semi-Directional Breakout Signal
-- **Entry**: Opening price above previous high → BUY; below previous low → SELL
-- **Exit**: Next day closing price
-- **Rationale**: Simple breakout strategy for volatility regimes
-
-### 5. Portfolio Construction
-- Combines three strategies with inverse volatility weighting (20-day rolling window)
-- Ensemble weights: Mean Reversion (45%), Trend Following (15%), Semi-Directional (40%)
-- Tracks individual and ensemble equity curves starting from 100
-
-### 6. Performance Metrics
-
-The notebook calculates the following metrics for each strategy and the ensemble:
-
-| Metric | Description |
-|--------|-------------|
-| Total PnL | Total profit/loss over the period |
-| CAGR | Compound Annual Growth Rate |
-| Sharpe Ratio | Risk-adjusted return (252-day annualized) |
-| Max DD | Maximum drawdown from peak |
-| Win Rate | Percentage of winning trades |
-| Avg Trade PnL | Average profit/loss per trade |
-| Num Trades | Total number of trades executed |
-| Final Equity | Final portfolio value starting from 100 |
-| Calmar Ratio | CAGR / Max Drawdown |
-
-## Results Summary
-
-Based on the backtest output:
-
-| Strategy | Total PnL | CAGR | Sharpe | Max DD | Win Rate | Calmar |
-|----------|-----------|------|--------|--------|----------|--------|
-| Mean Reversion | 1.08 | 2.04% | 0.33 | 3.54% | 49.23% | 0.58 |
-| Trend Following | 0.39 | 0.74% | 0.15 | 3.83% | 60.00% | 0.19 |
-| Semi-Directional | 3.93 | 7.52% | 1.20 | 3.83% | 60.00% | 1.96 |
-| **Ensemble** | **2.20** | **4.17%** | **1.40** | **1.72%** | **57.01%** | **2.42** |
-
-### Key Observations
-
-- **Semi-Directional**: Highest returns and Sharpe ratio among individual strategies
-- **Ensemble**: Best risk-adjusted performance with lowest maximum drawdown and highest Calmar ratio
-- **Diversification**: Ensemble combines the strengths of all strategies while reducing drawdowns
-- **Trade Frequency**: 65-107 trades across strategies, indicating sufficient sample size
+Requires `statsmodels`:
+```bash
+pip install statsmodels
+```
+Computes IV term structure and Hurst exponent to analyze market regimes.
 
 ## Output Files
 
-The notebook generates two CSV files:
+### strategy_returns_log.csv
 
-1. **strategy_metrics_summary.csv** - Summary table of all performance metrics
-2. **strategy_returns_log.csv** - Daily returns and equity values for all strategies
+Contains daily P&L for all sleeves and ensemble blends, including:
+- Individual sleeve returns (`mean_pnl`, `trend_pnl`, `semi_pnl`)
+- Ensemble blend returns (`pnl_static`, `pnl_iv`, `pnl_rw`, `pnl_live`)
+- Dynamic weights (`w_iv_*`, `w_rw_*`)
+- Equity curves (`eq_*`)
 
-## Visualization
+### strategy_metrics_summary.csv
 
-The notebook plots equity curves for all four strategies (3 individual + ensemble), showing:
-- X-axis: Date
-- Y-axis: Equity (starting at 100)
-- Comparison of cumulative performance over time
+Performance metrics for all strategies:
+- Trades, Win Rate, CAGR, Sharpe, Sortino, Max DD, Calmar
 
-## Potential Next Steps
+### equity_curves.png
 
-1. **Transaction Costs**: Add realistic transaction costs and slippage
-2. **Position Sizing**: Implement dynamic position sizing based on volatility
-3. **Optimization**: Fine-tune signal thresholds using walk-forward optimization
-4. **Risk Management**: Add stop-loss and take-profit rules
-5. **Options Greeks**: Incorporate Delta and Gamma for more accurate P&L
-6. **Machine Learning**: Use ML to enhance signal generation
+Visualization of equity curves for all strategies over the test period.
 
+## Key Technical Details
 
-Always validate with live paper trading before deploying with real capital.
+### Feature Engineering
+- **ATR (14-bar)**: Average True Range for volatility measurement
+- **AEMA**: Adaptive EMA with alpha based on normalized ATR
+- **Trend Indicators**: Fast/Slow EWM crossover, momentum, breakout strength
+- **Mean Reversion**: 20-day rolling Z-score of closing prices
+
+### Option Pricing
+- Black-Scholes for implied volatility calculations
+- Put-call parity for synthetic spot construction
+- ATM strike selection via minimum distance to spot
+
+### Risk Management
+- Gap-contamination guard (avoids signals near trading gaps)
+- Inverse-volatility weighting for ensemble blending
+- No leverage (100% equity baseline)
+
+## Important Notes
+
+1. **No transaction costs** are included in reported returns
+2. **Warm-up period**: 2023-2024 data used for feature initialization
+3. **Test window**: 2025-01-01 to 2026-05-15
+4. **Gap-contaminated rows**: 38 rows removed from MR and Trend signals
+5. **Risk-free rate**: 7% INR overnight proxy
